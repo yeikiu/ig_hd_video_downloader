@@ -1,0 +1,15 @@
+.firefox/*.zip
+firefox/*.zip
+*.map
+_dist/
+node_modules/
+.idea/workspace.xml
+/dist/
+/zip/
+./InstagramDownloader.zip
+InstagramDownloader.zip
+.idea/*.iws
+*.iws
+tmp.json
+.claude
+.demos
