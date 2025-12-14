@@ -2,6 +2,8 @@
 
 A minimal browser extension for downloading Instagram videos in the highest quality available, with automatic FFmpeg merging of video and audio tracks.
 
+![Post Demo](.screenshots/single_post_demo.png)
+
 ## Features
 
 - **HD Video Downloads**: Automatically downloads the highest quality video available
