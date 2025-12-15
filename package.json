@@ -4,6 +4,7 @@
   "description": "Minimal Instagram HD video downloader with FFmpeg support",
   "scripts": {
     "build": "node build-native.js",
+    "build:production": "npm run build && node zip-dist.js",
     "build:watch": "npx tsc --watch",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix"
@@ -18,6 +19,7 @@
     "@types/webextension-polyfill": "^0.12.0",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
+    "archiver": "^7.0.1",
     "eslint": "^9.16.0",
     "sass": "^1.81.1",
     "typescript": "^5.7.0"
