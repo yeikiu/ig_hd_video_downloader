@@ -33,7 +33,7 @@ const getWrapper = (): HTMLElement => {
     return WRAPPER;
 };
 
- 
+
 export namespace Alert {
 
     export const create = (text: string, type: AlertType, dismissible: boolean): HTMLElement => {
@@ -69,8 +69,8 @@ export namespace Alert {
 
     export const remove = async (element: HTMLElement): Promise<void> => {
         const animation = element.animate(
-            [{opacity: '1'}, {opacity: '0'}],
-            {duration: 300, fill: 'forwards'},
+            [{ opacity: '1' }, { opacity: '0' }],
+            { duration: 300, fill: 'forwards' },
         );
         await animation.finished;
         element.remove();
@@ -78,9 +78,15 @@ export namespace Alert {
 
     const animateIn = async (element: HTMLElement): Promise<void> => {
         const animation = element.animate(
-            [{opacity: '0'}, {opacity: '1'}],
-            {duration: 300, fill: 'forwards'},
+            [{ opacity: '0' }, { opacity: '1' }],
+            { duration: 300, fill: 'forwards' },
         );
         await animation.finished;
+    };
+    export const updateText = (alert: HTMLElement, text: string): void => {
+        const messageEl = alert.querySelector('.alert-message') as HTMLElement;
+        if (messageEl) {
+            messageEl.innerText = text;
+        }
     };
 }

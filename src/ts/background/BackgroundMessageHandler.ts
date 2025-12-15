@@ -43,20 +43,43 @@ class BackgroundMessageHandler {
         // console.log('[Background] Offscreen document created');
     }
 
-    private static async onMessage(message: any): Promise<any> {
+    private static currentProcessingTabId: number | null = null;
+
+    private static async onMessage(message: any, sender: browser.Runtime.MessageSender): Promise<any> {
         // console.log('[Background] Received message:', message.type);
 
         // Ignore messages meant for offscreen document - return undefined to let offscreen handle it
         if (message.type === 'FFMPEG_MERGE') {
-            return undefined; // Don't handle offscreen-specific messages, let them pass through
+            return undefined;
+        }
+
+        // Handle progress from offscreen
+        if (message.type === 'FFMPEG_PROGRESS') {
+            if (BackgroundMessageHandler.currentProcessingTabId) {
+                // Forward to content script
+                try {
+                    await browser.tabs.sendMessage(BackgroundMessageHandler.currentProcessingTabId, {
+                        type: DownloadType.ffmpegProgress,
+                        progress: message.progress
+                    });
+                } catch (e) {
+                    // Tab might be closed
+                    console.error('Failed to send progress to tab:', e);
+                }
+            }
+            return;
         }
 
         if (message.type === DownloadType.ffmpegMerge) {
+            // Store the tab ID that requested the merge
+            if (sender.tab && sender.tab.id) {
+                BackgroundMessageHandler.currentProcessingTabId = sender.tab.id;
+            }
+
             const ffmpegMsg = message as FFmpegMergeMessage;
             /* console.log('[Background] Received FFmpeg merge request:', {
                 videoUrl: ffmpegMsg.videoUrl?.substring(0, 100),
                 audioUrl: ffmpegMsg.audioUrl?.substring(0, 100),
-                outputFileName: ffmpegMsg.outputFileName
             }); */
 
             try {
@@ -69,7 +92,8 @@ class BackgroundMessageHandler {
                     type: 'FFMPEG_MERGE',
                     videoUrl: ffmpegMsg.videoUrl,
                     audioUrl: ffmpegMsg.audioUrl,
-                    outputFileName: ffmpegMsg.outputFileName
+                    outputFileName: ffmpegMsg.outputFileName,
+                    whatsappMode: ffmpegMsg.whatsappMode
                 }) as { success: boolean; blobUrl?: string; error?: string } | undefined;
 
                 if (!result || !result.success) {
@@ -86,11 +110,13 @@ class BackgroundMessageHandler {
                 });
 
                 // console.log('[Background] Download initiated successfully');
+                BackgroundMessageHandler.currentProcessingTabId = null;
 
                 return { success: true };
             } catch (error) {
                 console.error('[Background] FFmpeg merge failed:', error);
                 console.error('[Background] Error stack:', error instanceof Error ? error.stack : 'N/A');
+                BackgroundMessageHandler.currentProcessingTabId = null;
                 return { success: false, error: error instanceof Error ? error.message : String(error) };
             }
         }

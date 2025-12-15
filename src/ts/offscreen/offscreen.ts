@@ -22,7 +22,13 @@ const handleMessage = async (message: any): Promise<any> => {
         const mergedBlob = await ffmpegMerger.mergeVideoAudio(
             videoBlob,
             audioBlob,
-            `${message.outputFileName}.mp4`
+            message.whatsappMode,
+            (progress) => {
+                browser.runtime.sendMessage({
+                    type: 'FFMPEG_PROGRESS',
+                    progress
+                });
+            }
         );
 
         // console.log('[Offscreen] Merge complete, creating blob URL...');

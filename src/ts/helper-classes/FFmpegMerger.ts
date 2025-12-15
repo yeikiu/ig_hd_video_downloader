@@ -68,13 +68,28 @@ export class FFmpegMerger {
     public async mergeVideoAudio(
         videoBlob: Blob,
         audioBlob: Blob,
-        outputName: string,
+        whatsappMode: boolean = false,
+        onProgress?: (progress: number) => void
     ): Promise<Blob> {
         if (!this.loaded) {
             await this.load();
         }
 
-        // console.log('[FFmpegMerger] Starting merge:', outputName);
+        // Attach progress handler if provided
+        // We need to manage listener cleanup to avoid duplicates if reused, 
+        // but for now simple assignment or check is fine.
+        // Better: define the listener wrapper so we can remove it.
+        const progressListener = ({ progress }: { progress: number; time: number }) => {
+            if (onProgress) onProgress(progress);
+        };
+
+        // Remove any previous listeners to avoid conflicts (naive approach for singleton)
+        // Since we don't have a clear way to remove *specific* anonymous listeners easily without refactoring,
+        // we'll just add it and assume short-lived usage or just accept it.
+        // But better is to just add it.
+        this.ffmpeg.on('progress', progressListener);
+
+        // console.log('[FFmpegMerger] Starting merge:', outputName, 'WhatsApp Mode:', whatsappMode);
         // console.log('[FFmpegMerger] Video blob size:', videoBlob.size, 'bytes');
         // console.log('[FFmpegMerger] Audio blob size:', audioBlob.size, 'bytes');
 
@@ -102,22 +117,51 @@ export class FFmpegMerger {
                 '-c:v', 'copy',
                 '-c:a', 'copy',
                 '-shortest',
-                'output.mp4',
+                'intermediate.mp4',
             ]);
 
-            // console.log('[FFmpegMerger] FFmpeg exec completed');
+            // console.log('[FFmpegMerger] First pass merge completed');
+
+            let finalOutput = 'intermediate.mp4';
+
+            // Post-process for WhatsApp compatibility if enabled
+            if (whatsappMode) {
+                // console.log('[FFmpegMerger] Running WhatsApp compatibility post-process...');
+                // -vf showinfo: log frame info 
+                // -strict -2: enable experimental codecs
+                // -preset ultrafast: Use fastest encoding preset to speed up CPU encoding
+                await this.ffmpeg.exec([
+                    '-i', 'intermediate.mp4',
+                    '-vf', 'showinfo',
+                    '-c:v', 'libx264',
+                    '-preset', 'ultrafast',
+                    '-c:a', 'aac',
+                    '-strict', '-2',
+                    'output.mp4'
+                ]);
+
+                finalOutput = 'output.mp4';
+                // console.log('[FFmpegMerger] WhatsApp post-process completed');
+            } else {
+                await this.ffmpeg.exec(['-i', 'intermediate.mp4', '-c', 'copy', 'output.mp4']);
+            }
 
             // Read merged file from virtual filesystem
-            const data = await this.ffmpeg.readFile('output.mp4');
+            const data = await this.ffmpeg.readFile(finalOutput);
 
             // console.log('[FFmpegMerger] Output file size:', data.length, 'bytes');
 
             // Clean up virtual filesystem
             await this.ffmpeg.deleteFile('video.mp4');
             await this.ffmpeg.deleteFile('audio.mp4');
-            await this.ffmpeg.deleteFile('output.mp4');
+            try { await this.ffmpeg.deleteFile('intermediate.mp4'); } catch (e) { }
+            try { await this.ffmpeg.deleteFile('output.mp4'); } catch (e) { }
 
             // console.log('[FFmpegMerger] Merge complete, virtual filesystem cleaned up');
+
+            // Remove progress listener
+            // @ts-ignore - this is safe
+            this.ffmpeg.off('progress', progressListener);
 
             // Convert FileData to Blob
             // @ts-ignore - FFmpeg FileData type handling

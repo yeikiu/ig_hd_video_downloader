@@ -79,8 +79,21 @@ export class PostDownloader extends Downloader {
             // console.log('[PostDownloader] Account name:', postAccountName);
             // console.log('[PostDownloader] Account article:', article);
 
+            // Get WhatsApp mode setting
+            const { whatsappMode } = await browser.storage.local.get('whatsappMode');
+            const processingMsg = whatsappMode ? 'Processing for WhatsApp (Slower)...' : 'Processing video with FFmpeg...';
+
             // Show info alert to user
-            const processingAlert = await Alert.createAndAdd('Processing video with FFmpeg...', 'default', false, null);
+            const processingAlert = await Alert.createAndAdd(`${processingMsg} 0%`, 'default', false, null);
+
+            // Progress listener
+            const progressListener = (message: any) => {
+                if (message.type === DownloadType.ffmpegProgress) {
+                    const percent = Math.round(message.progress * 100);
+                    Alert.updateText(processingAlert, `${processingMsg} ${percent}%`);
+                }
+            };
+            browser.runtime.onMessage.addListener(progressListener);
 
             try {
                 // console.log('[PostDownloader] Sending FFmpeg merge request to background...');
@@ -90,11 +103,15 @@ export class PostDownloader extends Downloader {
                 const ffmpegMessage: FFmpegMergeMessage = {
                     type: DownloadType.ffmpegMerge,
                     videoUrl: videoUrl,
-                    audioUrl: audioUrl || videoUrl,
-                    outputFileName: outputFileName,
+                    audioUrl: audioUrl ?? videoUrl,
+                    outputFileName,
+                    whatsappMode: !!whatsappMode,
                 };
 
                 const result = await browser.runtime.sendMessage(ffmpegMessage) as { success: boolean; error?: string } | null;
+
+                // Remove listener
+                browser.runtime.onMessage.removeListener(progressListener);
 
                 // Remove processing alert
                 await Alert.remove(processingAlert);
