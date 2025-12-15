@@ -1,20 +1,172 @@
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IG HD Downloader Options</title>
     <style>
+        :root {
+            --primary: #c13584;
+            --gradient: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+            --bg: #fafafa;
+            --text: #262626;
+            --card-bg: #ffffff;
+            --border: #dbdbdb;
+        }
+
         body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
             margin: 0;
+            padding: 16px;
+            width: 320px;
+            font-size: 14px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .icon {
+            width: 32px;
+            height: 32px;
+            margin-right: 12px;
+        }
+
+        h1 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .option-group {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .option-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .option-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .option-label {
+            font-weight: 500;
+        }
+
+        .option-desc {
+            font-size: 12px;
+            color: #8e8e8e;
+            margin-top: 4px;
+            display: block;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: #2196F3;
+            background-image: var(--gradient);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(16px);
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #8e8e8e;
+            margin-top: 16px;
+        }
+
+        #status {
+            height: 20px;
+            color: #2196F3;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 8px;
         }
     </style>
-    <title>Instagram HD-Video Downloader</title>
 </head>
 
 <body>
-    <p>TODO</p>
+    <div class="header">
+        <img src="../icons/icon48.png" alt="Icon" class="icon">
+        <h1>IG HD Downloader</h1>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="option-group">
+        <div class="option-item">
+            <div>
+                <span class="option-label">Enable Extension</span>
+                <span class="option-desc">Master switch to turn on/off</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="masterToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="footer">
+        <span id="version">...</span>
+    </div>
+
+    <script type="module" src="ts/options/options.js"></script>
 </body>
 
 </html>

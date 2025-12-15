@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IG Downloader Minimal",
-  "description": "Minimal Instagram image and video downloader with FFmpeg support - posts and reels only",
+  "description": "Minimal Instagram HD video downloader with FFmpeg support - video posts and reels supported",
   "version": "2.0.0",
   "icons": {
     "16": "icons/icon16.png",
@@ -30,6 +30,15 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
   },
+  "action": {
+    "default_popup": "options.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
@@ -37,7 +46,8 @@
   "permissions": [
     "downloads",
     "tabs",
-    "offscreen"
+    "offscreen",
+    "storage"
   ],
   "host_permissions": [
     "*://*.instagram.com/*",

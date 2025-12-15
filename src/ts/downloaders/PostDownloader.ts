@@ -91,7 +91,7 @@ export class PostDownloader extends Downloader {
                     type: DownloadType.ffmpegMerge,
                     videoUrl: videoUrl,
                     audioUrl: audioUrl || videoUrl,
-                    outputFileName: outputFileName
+                    outputFileName: outputFileName,
                 };
 
                 const result = await browser.runtime.sendMessage(ffmpegMessage) as { success: boolean; error?: string } | null;
@@ -472,7 +472,14 @@ export class PostDownloader extends Downloader {
         console.log('[PostDownloader] Navigation interceptor installed');
     }
 
-    public init(): void {
+    public async init(): Promise<void> {
+        // Check if extension is enabled
+        const { extensionEnabled } = await browser.storage.local.get('extensionEnabled');
+        if (extensionEnabled === false) {
+            console.log('[PostDownloader] Extension disabled by user options');
+            return;
+        }
+
         this.removed = false;
         super.init();
 

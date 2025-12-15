@@ -46,10 +46,17 @@ if (fs.existsSync(scssDir)) {
 // Copy static files
 console.log('[Build] Copying static files...');
 
-// Copy manifest
-fs.copyFileSync(
-    path.join(SRC, 'manifest_chrome.json'),
-    path.join(DIST, 'manifest.json')
+// Copy manifest with version sync
+const packageJson = require('./package.json');
+const manifestSrc = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest_chrome.json'), 'utf8'));
+
+// Sync version from package.json
+manifestSrc.version = packageJson.version;
+// Update name to include [DEV] if it's a dev build? No, keep it clean.
+
+fs.writeFileSync(
+    path.join(DIST, 'manifest.json'),
+    JSON.stringify(manifestSrc, null, 2)
 );
 
 // Copy content-script-loader.js
