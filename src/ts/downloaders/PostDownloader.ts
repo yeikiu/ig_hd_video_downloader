@@ -21,7 +21,7 @@ export class PostDownloader extends Downloader {
             // Extract post ID - this is our primary identifier
             const videoArticle = video.closest('article');
             const postId = PostDownloader.extractPostIdFromArticleOrUrl(videoArticle);
-            console.log('[PostDownloader] Post ID:', postId);
+            // console.log('[PostDownloader] Post ID:', postId);
 
             if (!postId) {
                 Alert.createAndAdd('Could not find post ID', 'warn');
@@ -31,7 +31,7 @@ export class PostDownloader extends Downloader {
             // Find video data by postId (no duration fallback)
             let pageData = PostDownloader.extractVideoDataByPostId(postId);
             if (pageData) {
-                console.log('[PostDownloader] ✓ Found video data for post:', postId);
+                // console.log('[PostDownloader] ✓ Found video data for post:', postId);
             }
 
             // If not found, show user-friendly message
@@ -62,8 +62,8 @@ export class PostDownloader extends Downloader {
                 return;
             }
 
-            console.log('[PostDownloader] Extracted videoUrl:', videoUrl);
-            console.log('[PostDownloader] Extracted audioUrl:', audioUrl);
+            // console.log('[PostDownloader] Extracted videoUrl:', videoUrl);
+            // console.log('[PostDownloader] Extracted audioUrl:', audioUrl);
 
             // Extract account name from section's article element (where the download button is)
             const article = element.closest('article');
@@ -76,8 +76,8 @@ export class PostDownloader extends Downloader {
             console.log({ postAccountName })
 
             postAccountName = postAccountName || 'unknown';
-            console.log('[PostDownloader] Account name:', postAccountName);
-            console.log('[PostDownloader] Account article:', article);
+            // console.log('[PostDownloader] Account name:', postAccountName);
+            // console.log('[PostDownloader] Account article:', article);
 
             // Show info alert to user
             const processingAlert = await Alert.createAndAdd('Processing video with FFmpeg...', 'default', false, null);
@@ -138,7 +138,7 @@ export class PostDownloader extends Downloader {
     private static extractPostIdFromArticleOrUrl(article: HTMLElement | null): string | null {
         try {
             if (!article) {
-                console.log('[PostDownloader] No article element, trying URL extraction');
+                // console.log('[PostDownloader] No article element, trying URL extraction');
                 // On detail/reel pages without articles, extract from URL
                 return PostDownloader.extractPostIdFromUrl();
             }
@@ -180,11 +180,11 @@ export class PostDownloader extends Downloader {
      * No duration fallback - direct postId matching for reliability
      */
     private static extractVideoDataByPostId(postId: string): { videoUrl: string; audioUrl?: string } | null {
-        console.log('[PostDownloader] Searching for DASH manifest with postId:', postId);
+        // console.log('[PostDownloader] Searching for DASH manifest with postId:', postId);
 
         // Search all script tags for matching video data
         const allScripts = document.querySelectorAll('script');
-        console.log('[PostDownloader] Scanning', allScripts.length, 'script tags');
+        // console.log('[PostDownloader] Scanning', allScripts.length, 'script tags');
 
         for (const script of allScripts) {
             const content = script.textContent || '';
@@ -389,9 +389,9 @@ export class PostDownloader extends Downloader {
      * Create a new download button
      */
     public async createDownloadButton(): Promise<void> {
-        console.log('[PostDownloader] createDownloadButton called');
+        // console.log('[PostDownloader] createDownloadButton called');
         let postList: HTMLElement[] = [...document.querySelectorAll(QuerySelectors.postWrapper)] as HTMLElement[];
-        console.log('[PostDownloader] Found post wrappers:', postList.length);
+        // console.log('[PostDownloader] Found post wrappers:', postList.length);
 
         // Sometimes the button gets added at the moment the image gets updated
         // If this is the case the image download button cannot be added, so here is a timeout to try it again
@@ -569,7 +569,7 @@ export class PostDownloader extends Downloader {
      * @param element The Post the download button should be added to
      */
     private addDownloadButton(element: HTMLElement): void {
-        console.log('[PostDownloader] addDownloadButton called for element');
+        // console.log('[PostDownloader] addDownloadButton called for element');
 
         // Check if button already exists to prevent duplicates
         const existingButton = element.querySelector('.post-download-button');

@@ -126,20 +126,7 @@ if (fs.existsSync(optionsHtml)) {
 // Copy offscreen HTML with import map
 const offscreenHtml = path.join(SRC, 'offscreen/offscreen.html');
 if (fs.existsSync(offscreenHtml)) {
-    let html = fs.readFileSync(offscreenHtml, 'utf8');
-    // Add import map before the script tag
-    const importMap = `<script type="importmap">
-{
-  "imports": {
-    "webextension-polyfill": "./node_modules/webextension-polyfill/index.js",
-    "@ffmpeg/ffmpeg": "./node_modules/@ffmpeg/ffmpeg/dist/esm/index.js",
-    "@ffmpeg/util": "./node_modules/@ffmpeg/util/dist/esm/index.js"
-  }
-}
-</script>
-`;
-    html = html.replace('</head>', importMap + '</head>');
-    fs.writeFileSync(path.join(DIST, 'offscreen.html'), html);
+    fs.copyFileSync(offscreenHtml, path.join(DIST, 'offscreen.html'));
 }
 
 // Create ZIP package

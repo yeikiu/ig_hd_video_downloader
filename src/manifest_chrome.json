@@ -4,15 +4,23 @@
   "description": "Minimal Instagram image and video downloader with FFmpeg support - posts and reels only",
   "version": "2.0.0",
   "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png",
     "512": "icons/instagram.png"
   },
   "web_accessible_resources": [
     {
       "resources": [
-        "icons/instagram.png",
-        "lib/*",
-        "ts/*",
-        "node_modules/*"
+        "icons/*.png",
+        "css/alert.css",
+        "ts/index.js",
+        "ts/downloaders/*.js",
+        "ts/components/*.js",
+        "ts/models/*.js",
+        "ts/QuerySelectors.js",
+        "node_modules/webextension-polyfill/*.js"
       ],
       "matches": [
         "*://*.instagram.com/*"
