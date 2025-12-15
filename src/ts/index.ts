@@ -1,17 +1,15 @@
-import { singleton } from './decorators';
-import { PostDownloader } from './downloaders/PostDownloader';
-import pkg from '../../package.json';
+import { PostDownloader } from './downloaders/PostDownloader.js';
 
 /**
  * Addon manager (Instanciate only once!)
  */
-@singleton
 class AddonManager {
     private postDownloader: PostDownloader = new PostDownloader();
 
     public constructor() {
+        console.log(`[AddonManager] Initializing v2.0.0...`);
         this.postDownloader.init();
-        console.log(`[PostDownloader]: AddonManager created successfully! v${pkg.version}`);
+        console.log(`[AddonManager] Initialization complete`);
     }
 }
 

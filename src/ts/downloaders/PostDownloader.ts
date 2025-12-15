@@ -1,8 +1,8 @@
 import browser from 'webextension-polyfill';
-import { Alert } from '../components/Alert';
-import { DownloadType, FFmpegMergeMessage } from '../models/extension';
-import { QuerySelectors } from '../QuerySelectors';
-import { Downloader } from './Downloader';
+import { Alert } from '../components/Alert.js';
+import { DownloadType, FFmpegMergeMessage } from '../models/extension.js';
+import { QuerySelectors } from '../QuerySelectors.js';
+import { Downloader } from './Downloader.js';
 
 
 /**
@@ -13,62 +13,28 @@ export class PostDownloader extends Downloader {
     private creationTimeoutList: number[] = [];
     private removed = true;
     private autoDownloadTriggered = false;
+    private static navigationInterceptorInstalled = false;
+    private static lastFullNavigationUrl = '';
 
     private static async downloadVideoWithMerge(video: HTMLVideoElement, element: HTMLElement): Promise<void> {
         try {
-            // Get video duration from the playing video element
-            const videoDuration = video.duration;
-            console.log('[PostDownloader] Video duration:', videoDuration);
-
-            // Try to extract a unique post identifier from the video's article
+            // Extract post ID - this is our primary identifier
             const videoArticle = video.closest('article');
-            const postId = PostDownloader.extractPostIdFromArticle(videoArticle);
-            console.log('[PostDownloader] Post ID from video article:', postId);
+            const postId = PostDownloader.extractPostIdFromArticleOrUrl(videoArticle);
+            console.log('[PostDownloader] Post ID:', postId);
 
             if (!postId) {
                 Alert.createAndAdd('Could not find post ID', 'warn');
                 return;
             }
 
-            // Strategy 1: Try to find video data in page scripts (detail pages after full navigation)
-            let pageData = PostDownloader.extractVideoDataFromArticle(videoArticle, videoDuration, postId);
+            // Find video data by postId (no duration fallback)
+            let pageData = PostDownloader.extractVideoDataByPostId(postId);
             if (pageData) {
-                console.log('[PostDownloader] Found URLs from page scripts');
+                console.log('[PostDownloader] ✓ Found video data for post:', postId);
             }
 
-            // Strategy 2.5: If on detail page and data not found, wait and retry
-            // Instagram may still be loading the DASH manifest data (especially on SPA navigation)
-            if (!pageData) {
-                const isDetailPage = window.location.pathname.match(/\/(p|reel)\/[^/]+/);
-                if (isDetailPage) {
-                    console.log('[PostDownloader] Detail page - waiting for Instagram to load DASH manifest data...');
-                    console.log('[PostDownloader] Looking for post ID:', postId);
-
-                    // Try up to 10 times with shorter delays (total 20 seconds)
-                    // SPA navigation may take longer to populate script tags
-                    for (let attempt = 1; attempt <= 10 && !pageData; attempt++) {
-                        const delay = attempt <= 5 ? attempt * 1000 : 2000; // 1s, 2s, 3s, 4s, 5s, then 2s each
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        console.log(`[PostDownloader] Retry attempt ${attempt}/10 after ${delay}ms...`);
-
-                        // Check page scripts for DASH manifest
-                        pageData = PostDownloader.extractVideoDataFromArticle(videoArticle, videoDuration, postId);
-                        if (pageData) {
-                            console.log(`[PostDownloader] ✓ Found URLs in page scripts after ${attempt} retry attempts`);
-                            break;
-                        }
-                    }
-
-                    if (!pageData) {
-                        console.log('[PostDownloader] No data found after 10 retries (20 seconds)');
-                    }
-                }
-            }
-
-            // Strategy 3 removed: Modal clicking doesn't populate script tags in Instagram's current architecture
-            // Strategy 4 removed: MediaSourceTracker - focusing on page scripts only
-
-            // If still not found after all strategies
+            // If not found, show user-friendly message
             if (!pageData) {
                 const isDetailPage = window.location.pathname.match(/\/(p|reel)\/[^/]+/);
                 if (isDetailPage) {
@@ -107,7 +73,7 @@ export class PostDownloader extends Downloader {
             if (!postAccountName) {
                 postAccountName = (document.querySelector(`main[role="main"] ${QuerySelectors.postAccountName}`) as HTMLElement | null)?.innerText;
             }
-            console.log({postAccountName})
+            console.log({ postAccountName })
 
             postAccountName = postAccountName || 'unknown';
             console.log('[PostDownloader] Account name:', postAccountName);
@@ -116,25 +82,39 @@ export class PostDownloader extends Downloader {
             // Show info alert to user
             const processingAlert = await Alert.createAndAdd('Processing video with FFmpeg...', 'default', false, null);
 
-            // Send FFmpeg merge request to background script
-            const message: FFmpegMergeMessage = {
-                type: DownloadType.ffmpegMerge,
-                videoUrl,
-                audioUrl,
-                accountName: postAccountName,
-                videoDuration: videoDuration,
-                outputFileName: `${postAccountName}_${Math.floor(videoDuration)}`
-            };
+            try {
+                console.log('[PostDownloader] Sending FFmpeg merge request to background...');
+                const outputFileName = `${postAccountName}_${postId}`;
 
-            const result = await browser.runtime.sendMessage(message) as { success?: boolean; error?: string };
+                // Send FFmpeg merge message to background script
+                const ffmpegMessage: FFmpegMergeMessage = {
+                    type: DownloadType.ffmpegMerge,
+                    videoUrl: videoUrl,
+                    audioUrl: audioUrl || videoUrl,
+                    outputFileName: outputFileName
+                };
 
-            // Remove processing alert
-            await Alert.remove(processingAlert);
+                const result = await browser.runtime.sendMessage(ffmpegMessage) as { success: boolean; error?: string } | null;
 
-            if (!result?.success) {
-                Alert.createAndAdd(`Merge failed: ${result?.error || 'Unknown error'}`, 'warn');
-            } else {
-                Alert.createAndAdd('Video download started!', 'default', true, 3000);
+                // Remove processing alert
+                await Alert.remove(processingAlert);
+
+                if (result && result.success) {
+                    console.log('[PostDownloader] FFmpeg merge completed successfully');
+                    Alert.createAndAdd('Video download started!', 'default', true, 3000);
+                } else {
+                    const errorMessage = result ? result.error : 'No response from background script';
+                    console.error('[PostDownloader] FFmpeg merge failed:', errorMessage);
+                    // Only alert if we really think it failed. 
+                    // If result is null but user says it works, it might be a false negative.
+                    // But we should report it.
+                    Alert.createAndAdd(`Merge failed: ${errorMessage || 'Unknown error'}`, 'warn');
+                }
+            } catch (error) {
+                // Remove processing alert
+                await Alert.remove(processingAlert);
+                console.error('[PostDownloader] Error during FFmpeg request:', error);
+                Alert.createAndAdd(`Merge failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'warn');
             }
         } catch (error) {
             console.error('[PostDownloader] Error during video merge:', error);
@@ -155,7 +135,7 @@ export class PostDownloader extends Downloader {
         return null;
     }
 
-    private static extractPostIdFromArticle(article: HTMLElement | null): string | null {
+    private static extractPostIdFromArticleOrUrl(article: HTMLElement | null): string | null {
         try {
             if (!article) {
                 console.log('[PostDownloader] No article element, trying URL extraction');
@@ -195,26 +175,16 @@ export class PostDownloader extends Downloader {
         }
     }
 
-    private static extractVideoDataFromArticle(
-        article: HTMLElement | null,
-        targetDuration: number,
-        postId: string | null
-    ): { videoUrl: string; audioUrl?: string } | null {
-        if (!article) {
-            console.log('[PostDownloader] No article element provided - searching entire page (detail/reel page)');
-        }
+    /**
+     * Extract video data from page scripts using postId ONLY
+     * No duration fallback - direct postId matching for reliability
+     */
+    private static extractVideoDataByPostId(postId: string): { videoUrl: string; audioUrl?: string } | null {
+        console.log('[PostDownloader] Searching for DASH manifest with postId:', postId);
 
-        console.log('[PostDownloader] Searching for video data in page scripts for postId:', postId, 'duration:', targetDuration);
-
-        // Search all script tags in the document for matching video data
+        // Search all script tags for matching video data
         const allScripts = document.querySelectorAll('script');
-        console.log('[PostDownloader] Searching through', allScripts.length, 'script tags in document');
-
-        const matches: Array<{
-            urls: { videoUrl: string; audioUrl?: string };
-            score: number;
-            matchType: string;
-        }> = [];
+        console.log('[PostDownloader] Scanning', allScripts.length, 'script tags');
 
         for (const script of allScripts) {
             const content = script.textContent || '';
@@ -222,105 +192,48 @@ export class PostDownloader extends Downloader {
 
             try {
                 const data = JSON.parse(content);
-                const result = PostDownloader.findMatchingDashManifestWithScore(data, targetDuration, postId);
+                const result = PostDownloader.findDashManifestByPostId(data, postId);
                 if (result) {
-                    matches.push(result);
+                    console.log('[PostDownloader] ✓ Found exact match for postId:', postId);
+                    return result;
                 }
             } catch (e) {
-                // Not valid JSON
+                // Not valid JSON, skip
             }
         }
 
-        if (matches.length === 0) {
-            console.log('[PostDownloader] No matching video data found in page scripts');
-            return null;
-        }
-
-        // Sort by score (highest first)
-        matches.sort((a, b) => b.score - a.score);
-
-        console.log('[PostDownloader] Found', matches.length, 'matches in page scripts, best:', matches[0].matchType, 'score:', matches[0].score);
-        return matches[0].urls;
+        console.log('[PostDownloader] No DASH manifest found for postId:', postId);
+        return null;
     }
 
-    private static findMatchingDashManifestWithScore(
+    /**
+     * Recursively search for DASH manifest matching the postId
+     * Returns first exact match found
+     */
+    private static findDashManifestByPostId(
         obj: any,
-        targetDuration: number,
-        postId: string | null = null,
+        postId: string,
         depth = 0
-    ): { urls: { videoUrl: string; audioUrl?: string }; score: number; matchType: string } | null {
+    ): { videoUrl: string; audioUrl?: string } | null {
         // Prevent infinite recursion
         if (depth > 30 || !obj || typeof obj !== 'object') {
             return null;
         }
 
-        let bestMatch: { urls: { videoUrl: string; audioUrl?: string }; score: number; matchType: string } | null = null;
-
-        // Check if this object has a video_dash_manifest field
+        // Check if this object has video_dash_manifest
         if (obj.video_dash_manifest && typeof obj.video_dash_manifest === 'string') {
-            const manifest = obj.video_dash_manifest;
+            // Check if this object matches our postId
+            const objStr = JSON.stringify(obj);
+            const hasExactPostId =
+                objStr.includes(`"shortcode":"${postId}"`) ||
+                objStr.includes(`"code":"${postId}"`) ||
+                objStr.includes(`"pk":"${postId}"`);
 
-            // Parse DASH manifest duration (format: PT43.945332S)
-            const durationMatch = manifest.match(/mediaPresentationDuration="PT([\d.]+)S"/);
-            if (durationMatch) {
-                const duration = parseFloat(durationMatch[1]);
-                const durationDiff = Math.abs(duration - targetDuration);
-
-                // Check if this object has the postId we're looking for
-                const objStr = JSON.stringify(obj);
-                const hasExactPostId = postId && (
-                    objStr.includes(`"shortcode":"${postId}"`) ||
-                    objStr.includes(`"code":"${postId}"`) ||
-                    objStr.includes(`"pk":"${postId}"`)
-                );
-
-                // If we have an exact postId match, accept it regardless of duration
-                // OR if duration matches within tolerance
-                if (hasExactPostId || durationDiff < 0.1) {
-                    // Extract video and audio URLs from DASH manifest
-                    const urls = PostDownloader.parseDashManifest(manifest);
-                    if (urls) {
-                        // Calculate match score based on available identifiers
-                        let score = 0;
-                        let matchType = '';
-
-                        // Best match: has the exact postId
-                        if (hasExactPostId) {
-                            score = 100;
-                            matchType = durationDiff < 0.1 ? 'exact_postId_and_duration' : 'exact_postId_only';
-                            console.log('[PostDownloader] Found exact postId match:', postId, 'with duration diff:', durationDiff.toFixed(2));
-                        }
-                        // Good match: postId appears somewhere in the object (less specific)
-                        else if (postId && objStr.includes(postId)) {
-                            score = 75;
-                            matchType = 'postId_mentioned_and_duration';
-                        }
-                        // Fallback: only duration match
-                        else {
-                            score = 50;
-                            matchType = 'duration_only';
-
-                            // Log what IDs this object has for debugging
-                            if (depth === 0) {
-                                const idMatch = objStr.match(/"(?:shortcode|code|id|pk)"\s*:\s*"([^"]+)"/);
-                                if (idMatch) {
-                                    console.log('[PostDownloader] Duration match found but with different ID:', idMatch[1], '(looking for:', postId, ')');
-                                }
-                            }
-                        }
-
-                        // Adjust score based on duration precision (closer = better)
-                        // But don't penalize too much if we have exact postId match
-                        if (hasExactPostId) {
-                            score -= Math.min(durationDiff * 0.1, 1); // Small penalty for duration mismatch with exact ID
-                        } else {
-                            score -= durationDiff * 10; // Larger penalty for duration-only matches
-                        }
-
-                        if (!bestMatch || score > bestMatch.score) {
-                            bestMatch = { urls, score, matchType };
-                        }
-                    }
+            if (hasExactPostId) {
+                // Found exact match - parse and return
+                const urls = PostDownloader.parseDashManifest(obj.video_dash_manifest);
+                if (urls) {
+                    return urls;
                 }
             }
         }
@@ -328,21 +241,17 @@ export class PostDownloader extends Downloader {
         // Recursively search nested objects and arrays
         if (Array.isArray(obj)) {
             for (const item of obj) {
-                const result = PostDownloader.findMatchingDashManifestWithScore(item, targetDuration, postId, depth + 1);
-                if (result && (!bestMatch || result.score > bestMatch.score)) {
-                    bestMatch = result;
-                }
+                const result = PostDownloader.findDashManifestByPostId(item, postId, depth + 1);
+                if (result) return result;
             }
         } else {
             for (const key in obj) {
-                const result = PostDownloader.findMatchingDashManifestWithScore(obj[key], targetDuration, postId, depth + 1);
-                if (result && (!bestMatch || result.score > bestMatch.score)) {
-                    bestMatch = result;
-                }
+                const result = PostDownloader.findDashManifestByPostId(obj[key], postId, depth + 1);
+                if (result) return result;
             }
         }
 
-        return bestMatch;
+        return null;
     }
 
     private static parseDashManifest(manifest: string): { videoUrl: string; audioUrl?: string } | null {
@@ -433,7 +342,7 @@ export class PostDownloader extends Downloader {
 
         // If we're on timeline OR in a modal, open new tab
         if (!isDetailPage || isModal) {
-            const postId = PostDownloader.extractPostIdFromArticle(element.closest('article'));
+            const postId = PostDownloader.extractPostIdFromArticleOrUrl(element.closest('article'));
             if (postId) {
                 const context = isModal ? 'Modal' : 'Timeline';
                 console.log(`[PostDownloader] ${context} detected - opening detail page in new tab:`, postId);
@@ -450,17 +359,17 @@ export class PostDownloader extends Downloader {
         const urlParams = new URLSearchParams(window.location.search);
         const imgIndex: string | null = urlParams.get('img_index') ?? null;
         const videoElements = Array.from<HTMLVideoElement>(document.querySelectorAll('main[role="main"] video'));
-        
+
         console.log({ imgIndex, length: videoElements.length });
 
         let video: HTMLVideoElement | undefined = undefined;
-        
+
         // Not a carousel
         if (imgIndex === null) {
             video = videoElements[0];
         } else {
             if (videoElements.length < 3) {
-                video = videoElements[Number(imgIndex)-1];
+                video = videoElements[Number(imgIndex) - 1];
             } else {
                 video = videoElements[1];
             }
@@ -480,7 +389,9 @@ export class PostDownloader extends Downloader {
      * Create a new download button
      */
     public async createDownloadButton(): Promise<void> {
+        console.log('[PostDownloader] createDownloadButton called');
         let postList: HTMLElement[] = [...document.querySelectorAll(QuerySelectors.postWrapper)] as HTMLElement[];
+        console.log('[PostDownloader] Found post wrappers:', postList.length);
 
         // Sometimes the button gets added at the moment the image gets updated
         // If this is the case the image download button cannot be added, so here is a timeout to try it again
@@ -499,13 +410,74 @@ export class PostDownloader extends Downloader {
      * Reinitialize the downloader
      */
     public reinitialize(): void {
+        console.log('[PostDownloader] Reinitializing...');
         this.remove();
         this.init();
+    }
+
+    /**
+     * Install navigation interceptor to force full page loads for posts/reels
+     * This ensures DASH manifest data is always loaded properly
+     */
+    private static installNavigationInterceptor(): void {
+        if (PostDownloader.navigationInterceptorInstalled) {
+            return;
+        }
+        PostDownloader.navigationInterceptorInstalled = true;
+
+        console.log('[PostDownloader] Installing SPA navigation interceptor...');
+
+        // Intercept clicks on links to posts/reels
+        document.addEventListener('click', (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            const link = target.closest('a[href*="/p/"], a[href*="/reel/"]') as HTMLAnchorElement;
+
+            if (!link) return;
+
+            const href = link.href;
+
+            // Skip if this is a download button click or if we're already on this URL
+            if (target.closest('.post-download-button')) return;
+
+            // Check if this is a post/reel URL
+            const match = href.match(/\/(p|reel)\/([^/?]+)/);
+            if (!match) return;
+
+            // Check if we're already on a detail page for this post
+            const currentMatch = window.location.pathname.match(/\/(p|reel)\/([^/?]+)/);
+            if (currentMatch && currentMatch[2] === match[2]) {
+                // Already on this post's detail page, allow normal behavior
+                return;
+            }
+
+            // Prevent SPA navigation and force full page load
+            e.preventDefault();
+            e.stopPropagation();
+
+            const targetUrl = href.includes('?') ? href : href.replace(/\/$/, '');
+
+            // Avoid duplicate navigation
+            if (PostDownloader.lastFullNavigationUrl === targetUrl) {
+                console.log('[PostDownloader] Skipping duplicate navigation to:', targetUrl);
+                return;
+            }
+
+            PostDownloader.lastFullNavigationUrl = targetUrl;
+            console.log('[PostDownloader] Intercepted SPA navigation, forcing full page load:', targetUrl);
+
+            // Force full page load instead of SPA navigation
+            window.location.href = targetUrl;
+        }, true); // Use capture phase to intercept before Instagram's handlers
+
+        console.log('[PostDownloader] Navigation interceptor installed');
     }
 
     public init(): void {
         this.removed = false;
         super.init();
+
+        // Install navigation interceptor (once per page)
+        PostDownloader.installNavigationInterceptor();
 
         // Check if we should auto-download (coming from timeline click)
         this.checkAutoDownload();
@@ -589,7 +561,7 @@ export class PostDownloader extends Downloader {
     private canDownloadVideo(_element: HTMLElement): boolean {
         // Only show if element contains a video element
         return ((_element.closest('article')
-         ?? _element.closest('main'))?.querySelector('video') ?? null) !== null;
+            ?? _element.closest('main'))?.querySelector('video') ?? null) !== null;
     }
 
     /**
@@ -597,27 +569,33 @@ export class PostDownloader extends Downloader {
      * @param element The Post the download button should be added to
      */
     private addDownloadButton(element: HTMLElement): void {
+        console.log('[PostDownloader] addDownloadButton called for element');
+
         // Check if button already exists to prevent duplicates
         const existingButton = element.querySelector('.post-download-button');
         if (existingButton) {
+            console.log('[PostDownloader] Button already exists, skipping');
             return;
         }
 
         // Always show button (images download directly, videos navigate to detail page)
         if (!this.canDownloadVideo(element)) {
+            console.log('[PostDownloader] No video found, skipping');
             return;
         }
 
         // Always search for share button and insert before it
         const shareElement: HTMLElement = element.querySelector(QuerySelectors.postShare) as HTMLElement;
         if (!shareElement) {
+            console.log('[PostDownloader] No share element found, skipping');
             return;
         }
+
+        console.log('[PostDownloader] Creating download button...');
 
         // Clone the share button structure to match Instagram's style exactly
         const downloadButton = shareElement.cloneNode(true) as HTMLElement;
         downloadButton.classList.add('post-download-button');
-        downloadButton.onclick = () => PostDownloader.handleDownloadButtonClick(element);
 
         // Check if this is a button element (modal) or div (timeline/detail)
         const isButtonElement = downloadButton.tagName === 'BUTTON';
@@ -679,6 +657,16 @@ export class PostDownloader extends Downloader {
                 `;
             }
         }
+
+        // Add our click handler AFTER modifying innerHTML (which would remove event listeners)
+        downloadButton.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[PostDownloader] Download button clicked!', element);
+            await PostDownloader.handleDownloadButtonClick(element);
+        }, true); // Use capture phase to ensure we catch it first
+
+        console.log('[PostDownloader] Event listener attached to button');
 
         // Insert before the share button
         // In modals, buttons are wrapped in <span class="x1rg5ohu">, so we need to wrap ours too

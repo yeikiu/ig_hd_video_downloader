@@ -1,5 +1,4 @@
-import '../../scss/alert.scss';
-
+// CSS is loaded via manifest.json content_scripts.css
 export type AlertType = 'default' | 'warn' | 'error';
 
 const HTML = `
