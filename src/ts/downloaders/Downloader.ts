@@ -59,7 +59,7 @@ export abstract class Downloader {
         }
 
         Downloader.observerTimeout = setTimeout(() => {
-            console.log('[Downloader] DOM changed, reinitializing instances...');
+            // console.log('[Downloader] DOM changed, reinitializing instances...');
             // Reinitialize all downloader instances
             Downloader.instances.forEach(instance => {
                 instance.reinitialize();

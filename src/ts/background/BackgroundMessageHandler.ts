@@ -5,10 +5,10 @@ import OnInstalledDetailsType = browser.Runtime.OnInstalledDetailsType;
 class BackgroundMessageHandler {
 
     public constructor() {
-        console.log('[BackgroundMessageHandler] Initializing...');
+        // console.log('[BackgroundMessageHandler] Initializing...');
         browser.runtime.onInstalled.addListener(BackgroundMessageHandler.onUpdate);
         browser.runtime.onMessage.addListener(BackgroundMessageHandler.onMessage);
-        console.log('[BackgroundMessageHandler] Event listeners registered');
+        // console.log('[BackgroundMessageHandler] Event listeners registered');
     }
 
     private static async onUpdate(reason: OnInstalledDetailsType): Promise<void> {
@@ -28,23 +28,23 @@ class BackgroundMessageHandler {
         });
 
         if (existingContexts.length > 0) {
-            console.log('[Background] Offscreen document already exists');
+            // console.log('[Background] Offscreen document already exists');
             return;
         }
 
         // Create offscreen document
-        console.log('[Background] Creating offscreen document...');
+        // console.log('[Background] Creating offscreen document...');
         // @ts-ignore - chrome.offscreen is not in webextension-polyfill yet
         await chrome.offscreen.createDocument({
             url: 'offscreen.html',
             reasons: ['WORKERS'],
             justification: 'FFmpeg.wasm requires Web Workers for video/audio merging',
         });
-        console.log('[Background] Offscreen document created');
+        // console.log('[Background] Offscreen document created');
     }
 
     private static async onMessage(message: any): Promise<any> {
-        console.log('[Background] Received message:', message.type);
+        // console.log('[Background] Received message:', message.type);
 
         // Ignore messages meant for offscreen document - return undefined to let offscreen handle it
         if (message.type === 'FFMPEG_MERGE') {
@@ -53,18 +53,18 @@ class BackgroundMessageHandler {
 
         if (message.type === DownloadType.ffmpegMerge) {
             const ffmpegMsg = message as FFmpegMergeMessage;
-            console.log('[Background] Received FFmpeg merge request:', {
+            /* console.log('[Background] Received FFmpeg merge request:', {
                 videoUrl: ffmpegMsg.videoUrl?.substring(0, 100),
                 audioUrl: ffmpegMsg.audioUrl?.substring(0, 100),
                 outputFileName: ffmpegMsg.outputFileName
-            });
+            }); */
 
             try {
                 // Create offscreen document if needed
                 await BackgroundMessageHandler.ensureOffscreenDocument();
 
                 // Send merge request to offscreen document
-                console.log('[Background] Sending to offscreen document...');
+                // console.log('[Background] Sending to offscreen document...');
                 const result = await browser.runtime.sendMessage({
                     type: 'FFMPEG_MERGE',
                     videoUrl: ffmpegMsg.videoUrl,
@@ -76,7 +76,7 @@ class BackgroundMessageHandler {
                     throw new Error(result?.error || 'Merge failed');
                 }
 
-                console.log('[Background] Merge complete, downloading from blob URL...');
+                // console.log('[Background] Merge complete, downloading from blob URL...');
 
                 // Download using the blob URL from offscreen document
                 await browser.downloads.download({
@@ -85,7 +85,7 @@ class BackgroundMessageHandler {
                     saveAs: false
                 });
 
-                console.log('[Background] Download initiated successfully');
+                // console.log('[Background] Download initiated successfully');
 
                 return { success: true };
             } catch (error) {
@@ -99,7 +99,7 @@ class BackgroundMessageHandler {
 }
 
 // Initialize the background message handler
-console.log('[Background] Service worker starting...');
+// console.log('[Background] Service worker starting...');
 // @ts-ignore
 export const messageHandler = new BackgroundMessageHandler();
-console.log('[Background] Service worker initialized successfully');
+// console.log('[Background] Service worker initialized successfully');

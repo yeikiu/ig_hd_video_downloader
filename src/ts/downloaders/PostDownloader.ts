@@ -73,7 +73,7 @@ export class PostDownloader extends Downloader {
             if (!postAccountName) {
                 postAccountName = (document.querySelector(`main[role="main"] ${QuerySelectors.postAccountName}`) as HTMLElement | null)?.innerText;
             }
-            console.log({ postAccountName })
+            // console.log({ postAccountName })
 
             postAccountName = postAccountName || 'unknown';
             // console.log('[PostDownloader] Account name:', postAccountName);
@@ -83,7 +83,7 @@ export class PostDownloader extends Downloader {
             const processingAlert = await Alert.createAndAdd('Processing video with FFmpeg...', 'default', false, null);
 
             try {
-                console.log('[PostDownloader] Sending FFmpeg merge request to background...');
+                // console.log('[PostDownloader] Sending FFmpeg merge request to background...');
                 const outputFileName = `${postAccountName}_${postId}`;
 
                 // Send FFmpeg merge message to background script
@@ -100,7 +100,7 @@ export class PostDownloader extends Downloader {
                 await Alert.remove(processingAlert);
 
                 if (result && result.success) {
-                    console.log('[PostDownloader] FFmpeg merge completed successfully');
+                    // console.log('[PostDownloader] FFmpeg merge completed successfully');
                     Alert.createAndAdd('Video download started!', 'default', true, 3000);
                 } else {
                     const errorMessage = result ? result.error : 'No response from background script';
@@ -128,10 +128,10 @@ export class PostDownloader extends Downloader {
     private static extractPostIdFromUrl(): string | null {
         const match = window.location.pathname.match(/\/(p|reel)\/([^/]+)/);
         if (match) {
-            console.log('[PostDownloader] Found post ID from URL:', match[2]);
+            // console.log('[PostDownloader] Found post ID from URL:', match[2]);
             return match[2];
         }
-        console.log('[PostDownloader] No post ID found in URL');
+        // console.log('[PostDownloader] No post ID found in URL');
         return null;
     }
 
@@ -150,7 +150,7 @@ export class PostDownloader extends Downloader {
                 if (postLink && postLink.href) {
                     const match = postLink.href.match(/\/(p|reel)\/([^/]+)/);
                     if (match) {
-                        console.log('[PostDownloader] Found post ID from time link:', match[2]);
+                        // console.log('[PostDownloader] Found post ID from time link:', match[2]);
                         return match[2]; // Return the post short code
                     }
                 }
@@ -161,12 +161,12 @@ export class PostDownloader extends Downloader {
             if (postLink) {
                 const match = postLink.href.match(/\/(p|reel)\/([^/]+)/);
                 if (match) {
-                    console.log('[PostDownloader] Found post ID from article link:', match[2]);
+                    // console.log('[PostDownloader] Found post ID from article link:', match[2]);
                     return match[2]; // Return the post short code
                 }
             }
 
-            console.log('[PostDownloader] No post ID found in article, trying URL');
+            // console.log('[PostDownloader] No post ID found in article, trying URL');
             // Last resort: try URL extraction
             return PostDownloader.extractPostIdFromUrl();
         } catch (error) {
@@ -194,7 +194,7 @@ export class PostDownloader extends Downloader {
                 const data = JSON.parse(content);
                 const result = PostDownloader.findDashManifestByPostId(data, postId);
                 if (result) {
-                    console.log('[PostDownloader] ✓ Found exact match for postId:', postId);
+                    // console.log('[PostDownloader] ✓ Found exact match for postId:', postId);
                     return result;
                 }
             } catch (e) {
@@ -202,7 +202,7 @@ export class PostDownloader extends Downloader {
             }
         }
 
-        console.log('[PostDownloader] No DASH manifest found for postId:', postId);
+        // console.log('[PostDownloader] No DASH manifest found for postId:', postId);
         return null;
     }
 
@@ -318,7 +318,7 @@ export class PostDownloader extends Downloader {
             }
 
             if (!bestVideoUrl) {
-                console.log('[PostDownloader] No video URL found in DASH manifest');
+                // console.log('[PostDownloader] No video URL found in DASH manifest');
                 return null;
             }
 
@@ -326,7 +326,7 @@ export class PostDownloader extends Downloader {
             const videoQualityMbps = (bestVideoBandwidth / 1_000_000).toFixed(2);
             const audioQualityKbps = bestAudioBandwidth > 0 ? (bestAudioBandwidth / 1000).toFixed(0) : 'N/A';
 
-            console.log(`[PostDownloader] ✓ Selected HIGHEST quality - Video: ${videoQualityMbps} Mbps (${bestVideoBandwidth} bps), Audio: ${audioQualityKbps} kbps`);
+            // console.log(`[PostDownloader] ✓ Selected HIGHEST quality - Video: ${videoQualityMbps} Mbps (${bestVideoBandwidth} bps), Audio: ${audioQualityKbps} kbps`);
 
             return { videoUrl: bestVideoUrl, audioUrl: bestAudioUrl };
         } catch (error) {
@@ -345,7 +345,7 @@ export class PostDownloader extends Downloader {
             const postId = PostDownloader.extractPostIdFromArticleOrUrl(element.closest('article'));
             if (postId) {
                 const context = isModal ? 'Modal' : 'Timeline';
-                console.log(`[PostDownloader] ${context} detected - opening detail page in new tab:`, postId);
+                // console.log(`[PostDownloader] ${context} detected - opening detail page in new tab:`, postId);
                 window.open(`https://www.instagram.com/p/${postId}/?igdl=1`, '_blank');
                 return;
             } else {
@@ -360,7 +360,7 @@ export class PostDownloader extends Downloader {
         const imgIndex: string | null = urlParams.get('img_index') ?? null;
         const videoElements = Array.from<HTMLVideoElement>(document.querySelectorAll('main[role="main"] video'));
 
-        console.log({ imgIndex, length: videoElements.length });
+        // console.log({ imgIndex, length: videoElements.length });
 
         let video: HTMLVideoElement | undefined = undefined;
 
@@ -379,7 +379,7 @@ export class PostDownloader extends Downloader {
             Alert.createAndAdd('Could not find video', 'warn');
             return;
         }
-        console.log('[PostDownloader] Video found:', video?.tagName);
+        // console.log('[PostDownloader] Video found:', video?.tagName);
 
         // Extract and merge with FFmpeg
         await PostDownloader.downloadVideoWithMerge(video, element);
@@ -410,7 +410,7 @@ export class PostDownloader extends Downloader {
      * Reinitialize the downloader
      */
     public reinitialize(): void {
-        console.log('[PostDownloader] Reinitializing...');
+        // console.log('[PostDownloader] Reinitializing...');
         this.remove();
         this.init();
     }
@@ -425,7 +425,7 @@ export class PostDownloader extends Downloader {
         }
         PostDownloader.navigationInterceptorInstalled = true;
 
-        console.log('[PostDownloader] Installing SPA navigation interceptor...');
+        // console.log('[PostDownloader] Installing SPA navigation interceptor...');
 
         // Intercept clicks on links to posts/reels
         document.addEventListener('click', (e: MouseEvent) => {
@@ -458,25 +458,25 @@ export class PostDownloader extends Downloader {
 
             // Avoid duplicate navigation
             if (PostDownloader.lastFullNavigationUrl === targetUrl) {
-                console.log('[PostDownloader] Skipping duplicate navigation to:', targetUrl);
+                // console.log('[PostDownloader] Skipping duplicate navigation to:', targetUrl);
                 return;
             }
 
             PostDownloader.lastFullNavigationUrl = targetUrl;
-            console.log('[PostDownloader] Intercepted SPA navigation, forcing full page load:', targetUrl);
+            // console.log('[PostDownloader] Intercepted SPA navigation, forcing full page load:', targetUrl);
 
             // Force full page load instead of SPA navigation
             window.location.href = targetUrl;
         }, true); // Use capture phase to intercept before Instagram's handlers
 
-        console.log('[PostDownloader] Navigation interceptor installed');
+        // console.log('[PostDownloader] Navigation interceptor installed');
     }
 
     public async init(): Promise<void> {
         // Check if extension is enabled
         const { extensionEnabled } = await browser.storage.local.get('extensionEnabled');
         if (extensionEnabled === false) {
-            console.log('[PostDownloader] Extension disabled by user options');
+            // console.log('[PostDownloader] Extension disabled by user options');
             return;
         }
 
@@ -496,7 +496,7 @@ export class PostDownloader extends Downloader {
     private async checkAutoDownload(): Promise<void> {
         // Prevent multiple triggers
         if (this.autoDownloadTriggered) {
-            console.log('[PostDownloader] Auto-download already triggered, skipping');
+            // console.log('[PostDownloader] Auto-download already triggered, skipping');
             return;
         }
 
@@ -515,7 +515,7 @@ export class PostDownloader extends Downloader {
         // Mark as triggered immediately to prevent race conditions
         this.autoDownloadTriggered = true;
 
-        console.log('[PostDownloader] Auto-download mode detected - waiting for data...');
+        // console.log('[PostDownloader] Auto-download mode detected - waiting for data...');
 
         // Remove the ?igdl=1 parameter from URL immediately to prevent re-triggers
         window.history.replaceState({}, '', window.location.pathname);
@@ -527,14 +527,14 @@ export class PostDownloader extends Downloader {
 
             const downloadButton = document.querySelector('.post-download-button') as HTMLElement;
             if (downloadButton) {
-                console.log('[PostDownloader] Download button found - auto-clicking...');
+                // console.log('[PostDownloader] Download button found - auto-clicking...');
                 // Click the download button
                 downloadButton.click();
                 return;
             }
         }
 
-        console.log('[PostDownloader] Auto-download timeout - button not found after 30 seconds');
+        // console.log('[PostDownloader] Auto-download timeout - button not found after 30 seconds');
     }
 
     /**
@@ -550,7 +550,7 @@ export class PostDownloader extends Downloader {
             this.creationTimeoutList.push(setTimeout(resolve, 100) as unknown as number);
         });
         let postList = [...document.querySelectorAll(QuerySelectors.postWrapper)] as HTMLElement[];
-        console.log(['with timeout', postList]);
+        // console.log(['with timeout', postList]);
 
         if (postList.length === 0 || maxRetries <= retries) {
             if (!this.removed) {
@@ -581,24 +581,24 @@ export class PostDownloader extends Downloader {
         // Check if button already exists to prevent duplicates
         const existingButton = element.querySelector('.post-download-button');
         if (existingButton) {
-            console.log('[PostDownloader] Button already exists, skipping');
+            // console.log('[PostDownloader] Button already exists, skipping');
             return;
         }
 
         // Always show button (images download directly, videos navigate to detail page)
         if (!this.canDownloadVideo(element)) {
-            console.log('[PostDownloader] No video found, skipping');
+            // console.log('[PostDownloader] No video found, skipping');
             return;
         }
 
         // Always search for share button and insert before it
         const shareElement: HTMLElement = element.querySelector(QuerySelectors.postShare) as HTMLElement;
         if (!shareElement) {
-            console.log('[PostDownloader] No share element found, skipping');
+            // console.log('[PostDownloader] No share element found, skipping');
             return;
         }
 
-        console.log('[PostDownloader] Creating download button...');
+        // console.log('[PostDownloader] Creating download button...');
 
         // Clone the share button structure to match Instagram's style exactly
         const downloadButton = shareElement.cloneNode(true) as HTMLElement;
@@ -669,11 +669,11 @@ export class PostDownloader extends Downloader {
         downloadButton.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[PostDownloader] Download button clicked!', element);
+            // console.log('[PostDownloader] Download button clicked!', element);
             await PostDownloader.handleDownloadButtonClick(element);
         }, true); // Use capture phase to ensure we catch it first
 
-        console.log('[PostDownloader] Event listener attached to button');
+        // console.log('[PostDownloader] Event listener attached to button');
 
         // Insert before the share button
         // In modals, buttons are wrapped in <span class="x1rg5ohu">, so we need to wrap ours too

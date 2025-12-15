@@ -25,7 +25,7 @@ export class FFmpegMerger {
     public async load(): Promise<void> {
         if (this.loaded) return;
 
-        console.log('[FFmpegMerger] Loading FFmpeg from local files...');
+        // console.log('[FFmpegMerger] Loading FFmpeg from local files...');
 
         try {
             // Load from local lib directory (bundled with extension)
@@ -36,9 +36,9 @@ export class FFmpegMerger {
             // @ts-ignore - browser is provided by webextension-polyfill
             const workerURL = browser.runtime.getURL('js/node_modules_ffmpeg_ffmpeg_dist_esm_worker_js.js');
 
-            console.log('[FFmpegMerger] Core URL:', coreURL);
-            console.log('[FFmpegMerger] WASM URL:', wasmURL);
-            console.log('[FFmpegMerger] Worker URL:', workerURL);
+            // console.log('[FFmpegMerger] Core URL:', coreURL);
+            // console.log('[FFmpegMerger] WASM URL:', wasmURL);
+            // console.log('[FFmpegMerger] Worker URL:', workerURL);
 
             await this.ffmpeg.load({
                 coreURL,
@@ -47,7 +47,7 @@ export class FFmpegMerger {
             });
 
             this.loaded = true;
-            console.log('[FFmpegMerger] FFmpeg loaded successfully from local files');
+            // console.log('[FFmpegMerger] FFmpeg loaded successfully from local files');
         } catch (error) {
             console.error('[FFmpegMerger] Failed to load FFmpeg:', error);
             console.error('[FFmpegMerger] Error details:', {
@@ -74,16 +74,16 @@ export class FFmpegMerger {
             await this.load();
         }
 
-        console.log('[FFmpegMerger] Starting merge:', outputName);
-        console.log('[FFmpegMerger] Video blob size:', videoBlob.size, 'bytes');
-        console.log('[FFmpegMerger] Audio blob size:', audioBlob.size, 'bytes');
+        // console.log('[FFmpegMerger] Starting merge:', outputName);
+        // console.log('[FFmpegMerger] Video blob size:', videoBlob.size, 'bytes');
+        // console.log('[FFmpegMerger] Audio blob size:', audioBlob.size, 'bytes');
 
         try {
             // Write input files to FFmpeg virtual filesystem
             await this.ffmpeg.writeFile('video.mp4', await fetchFile(videoBlob));
             await this.ffmpeg.writeFile('audio.mp4', await fetchFile(audioBlob));
 
-            console.log('[FFmpegMerger] Files written to virtual filesystem');
+            // console.log('[FFmpegMerger] Files written to virtual filesystem');
 
             // Run FFmpeg command to merge audio and video
             // Use '?' suffix to make audio stream optional (handles video-only files)
@@ -105,19 +105,19 @@ export class FFmpegMerger {
                 'output.mp4',
             ]);
 
-            console.log('[FFmpegMerger] FFmpeg exec completed');
+            // console.log('[FFmpegMerger] FFmpeg exec completed');
 
             // Read merged file from virtual filesystem
             const data = await this.ffmpeg.readFile('output.mp4');
 
-            console.log('[FFmpegMerger] Output file size:', data.length, 'bytes');
+            // console.log('[FFmpegMerger] Output file size:', data.length, 'bytes');
 
             // Clean up virtual filesystem
             await this.ffmpeg.deleteFile('video.mp4');
             await this.ffmpeg.deleteFile('audio.mp4');
             await this.ffmpeg.deleteFile('output.mp4');
 
-            console.log('[FFmpegMerger] Merge complete, virtual filesystem cleaned up');
+            // console.log('[FFmpegMerger] Merge complete, virtual filesystem cleaned up');
 
             // Convert FileData to Blob
             // @ts-ignore - FFmpeg FileData type handling
