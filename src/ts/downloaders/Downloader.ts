@@ -7,27 +7,6 @@ export abstract class Downloader {
     private static instances: Downloader[] = [];
 
     /**
-     * Create a new downloader
-     */
-    public init(): void {
-        // Add this instance to the list
-        if (!Downloader.instances.includes(this)) {
-            Downloader.instances.push(this);
-        }
-
-        // Initialize the observer if not already done
-        if (!Downloader.mutationObserver) {
-            Downloader.mutationObserver = new MutationObserver(Downloader.handleMutation);
-            Downloader.mutationObserver.observe(document.body, {
-                childList: true,
-                subtree: true,
-            });
-        }
-
-        this.createDownloadButton();
-    }
-
-    /**
      * Handle DOM mutations
      */
     private static handleMutation(mutations: MutationRecord[]): void {
@@ -66,6 +45,29 @@ export abstract class Downloader {
             });
         }, 1000); // Debounce to 1 second
     }
+
+    /**
+     * Create a new downloader
+     */
+    public init(): void {
+        // Add this instance to the list
+        if (!Downloader.instances.includes(this)) {
+            Downloader.instances.push(this);
+        }
+
+        // Initialize the observer if not already done
+        if (!Downloader.mutationObserver) {
+            Downloader.mutationObserver = new MutationObserver(Downloader.handleMutation);
+            Downloader.mutationObserver.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+        }
+
+        this.createDownloadButton();
+    }
+
+
 
     /**
      * This method has to create a new download button

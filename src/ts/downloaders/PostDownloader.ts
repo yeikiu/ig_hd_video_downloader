@@ -10,11 +10,11 @@ import { Downloader } from './Downloader.js';
  */
 export class PostDownloader extends Downloader {
 
+    private static navigationInterceptorInstalled = false;
+    private static lastFullNavigationUrl = '';
     private creationTimeoutList: number[] = [];
     private removed = true;
     private autoDownloadTriggered = false;
-    private static navigationInterceptorInstalled = false;
-    private static lastFullNavigationUrl = '';
 
     private static async downloadVideoWithMerge(video: HTMLVideoElement, element: HTMLElement): Promise<void> {
         try {
@@ -29,7 +29,7 @@ export class PostDownloader extends Downloader {
             }
 
             // Find video data by postId (no duration fallback)
-            let pageData = PostDownloader.extractVideoDataByPostId(postId);
+            const pageData = PostDownloader.extractVideoDataByPostId(postId);
             if (pageData) {
                 // console.log('[PostDownloader] ✓ Found video data for post:', postId);
             }
@@ -214,7 +214,7 @@ export class PostDownloader extends Downloader {
                     // console.log('[PostDownloader] ✓ Found exact match for postId:', postId);
                     return result;
                 }
-            } catch (e) {
+            } catch {
                 // Not valid JSON, skip
             }
         }
@@ -339,12 +339,6 @@ export class PostDownloader extends Downloader {
                 return null;
             }
 
-            // Convert bandwidth to Mbps for readability
-            const videoQualityMbps = (bestVideoBandwidth / 1_000_000).toFixed(2);
-            const audioQualityKbps = bestAudioBandwidth > 0 ? (bestAudioBandwidth / 1000).toFixed(0) : 'N/A';
-
-            // console.log(`[PostDownloader] ✓ Selected HIGHEST quality - Video: ${videoQualityMbps} Mbps (${bestVideoBandwidth} bps), Audio: ${audioQualityKbps} kbps`);
-
             return { videoUrl: bestVideoUrl, audioUrl: bestAudioUrl };
         } catch (error) {
             console.error('[PostDownloader] Error parsing DASH manifest:', error);
@@ -361,7 +355,6 @@ export class PostDownloader extends Downloader {
         if (!isDetailPage || isModal) {
             const postId = PostDownloader.extractPostIdFromArticleOrUrl(element.closest('article'));
             if (postId) {
-                const context = isModal ? 'Modal' : 'Timeline';
                 // console.log(`[PostDownloader] ${context} detected - opening detail page in new tab:`, postId);
                 window.open(`https://www.instagram.com/p/${postId}/?igdl=1`, '_blank');
                 return;
@@ -402,40 +395,6 @@ export class PostDownloader extends Downloader {
         await PostDownloader.downloadVideoWithMerge(video, element);
     }
 
-    /**
-     * Create a new download button
-     */
-    public async createDownloadButton(): Promise<void> {
-        // console.log('[PostDownloader] createDownloadButton called');
-        let postList: HTMLElement[] = [...document.querySelectorAll(QuerySelectors.postWrapper)] as HTMLElement[];
-        // console.log('[PostDownloader] Found post wrappers:', postList.length);
-
-        // Sometimes the button gets added at the moment the image gets updated
-        // If this is the case the image download button cannot be added, so here is a timeout to try it again
-        if (postList.length === 0) {
-            postList = await this.retryCreateButton();
-        }
-        this.creationTimeoutList.forEach(t => clearTimeout(t));
-        this.creationTimeoutList = [];
-
-        postList.forEach((element: HTMLElement) => {
-            this.addDownloadButton(element);
-        });
-    }
-
-    /**
-     * Reinitialize the downloader
-     */
-    public reinitialize(): void {
-        // console.log('[PostDownloader] Reinitializing...');
-        this.remove();
-        this.init();
-    }
-
-    /**
-     * Install navigation interceptor to force full page loads for posts/reels
-     * This ensures DASH manifest data is always loaded properly
-     */
     private static installNavigationInterceptor(): void {
         if (PostDownloader.navigationInterceptorInstalled) {
             return;
@@ -489,6 +448,38 @@ export class PostDownloader extends Downloader {
         // console.log('[PostDownloader] Navigation interceptor installed');
     }
 
+    /**
+     * Create a new download button
+     */
+    public async createDownloadButton(): Promise<void> {
+        // console.log('[PostDownloader] createDownloadButton called');
+        let postList: HTMLElement[] = [...document.querySelectorAll(QuerySelectors.postWrapper)] as HTMLElement[];
+        // console.log('[PostDownloader] Found post wrappers:', postList.length);
+
+        // Sometimes the button gets added at the moment the image gets updated
+        // If this is the case the image download button cannot be added, so here is a timeout to try it again
+        if (postList.length === 0) {
+            postList = await this.retryCreateButton();
+        }
+        this.creationTimeoutList.forEach(t => clearTimeout(t));
+        this.creationTimeoutList = [];
+
+        postList.forEach((element: HTMLElement) => {
+            this.addDownloadButton(element);
+        });
+    }
+
+    /**
+     * Reinitialize the downloader
+     */
+    public reinitialize(): void {
+        // console.log('[PostDownloader] Reinitializing...');
+        this.remove();
+        this.init();
+    }
+
+
+
     public async init(): Promise<void> {
         // Check if extension is enabled
         const { extensionEnabled } = await browser.storage.local.get('extensionEnabled');
@@ -505,6 +496,14 @@ export class PostDownloader extends Downloader {
 
         // Check if we should auto-download (coming from timeline click)
         this.checkAutoDownload();
+    }
+
+    /**
+     * Remove the downloader
+     */
+    public remove(): void {
+        this.removed = true;
+        super.remove('.post-download-button');
     }
 
     /**
@@ -554,13 +553,7 @@ export class PostDownloader extends Downloader {
         // console.log('[PostDownloader] Auto-download timeout - button not found after 30 seconds');
     }
 
-    /**
-     * Remove the downloader
-     */
-    public remove(): void {
-        this.removed = true;
-        super.remove('.post-download-button');
-    }
+
 
     private async retryCreateButton(maxRetries: number = 20, retries: number = 0): Promise<HTMLElement[]> {
         await new Promise(resolve => {

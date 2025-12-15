@@ -4,6 +4,8 @@ import OnInstalledDetailsType = browser.Runtime.OnInstalledDetailsType;
 
 class BackgroundMessageHandler {
 
+    private static currentProcessingTabId: number | null = null;
+
     public constructor() {
         // console.log('[BackgroundMessageHandler] Initializing...');
         browser.runtime.onInstalled.addListener(BackgroundMessageHandler.onUpdate);
@@ -42,8 +44,6 @@ class BackgroundMessageHandler {
         });
         // console.log('[Background] Offscreen document created');
     }
-
-    private static currentProcessingTabId: number | null = null;
 
     private static async onMessage(message: any, sender: browser.Runtime.MessageSender): Promise<any> {
         // console.log('[Background] Received message:', message.type);

@@ -154,8 +154,8 @@ export class FFmpegMerger {
             // Clean up virtual filesystem
             await this.ffmpeg.deleteFile('video.mp4');
             await this.ffmpeg.deleteFile('audio.mp4');
-            try { await this.ffmpeg.deleteFile('intermediate.mp4'); } catch (e) { }
-            try { await this.ffmpeg.deleteFile('output.mp4'); } catch (e) { }
+            try { await this.ffmpeg.deleteFile('intermediate.mp4'); } catch { }
+            try { await this.ffmpeg.deleteFile('output.mp4'); } catch { }
 
             // console.log('[FFmpegMerger] Merge complete, virtual filesystem cleaned up');
 
