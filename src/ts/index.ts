@@ -7,9 +7,9 @@ class AddonManager {
     private postDownloader: PostDownloader = new PostDownloader();
 
     public constructor() {
-        console.log(`[AddonManager] Initializing v2.0.0...`);
+        // console.log(`[AddonManager] Initializing v2.0.0...`);
         this.postDownloader.init();
-        console.log(`[AddonManager] Initialization complete`);
+        // console.log(`[AddonManager] Initialization complete`);
     }
 }
 
