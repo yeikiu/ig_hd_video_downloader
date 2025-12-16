@@ -28,8 +28,10 @@ export class PostDownloader extends Downloader {
                 return;
             }
 
-            // Find video data by postId (no duration fallback)
-            const pageData = PostDownloader.extractVideoDataByPostId(postId);
+            // Find video data by postId with duration fallback
+            // Carousel videos share the same postId, so we use duration to distinguish them
+            const videoDuration = video.duration;
+            const pageData = PostDownloader.extractVideoDataByPostId(postId, videoDuration);
             if (pageData) {
                 // console.log('[PostDownloader] ✓ Found video data for post:', postId);
             }
@@ -192,16 +194,18 @@ export class PostDownloader extends Downloader {
         }
     }
 
-    /**
-     * Extract video data from page scripts using postId ONLY
-     * No duration fallback - direct postId matching for reliability
-     */
-    private static extractVideoDataByPostId(postId: string): { videoUrl: string; audioUrl?: string } | null {
-        // console.log('[PostDownloader] Searching for DASH manifest with postId:', postId);
+    private static extractVideoDataByPostId(postId: string, duration: number): { videoUrl: string; audioUrl?: string } | null {
+        // console.log('[PostDownloader] Searching for DASH manifest with postId:', postId, 'Duration:', duration);
 
         // Search all script tags for matching video data
         const allScripts = document.querySelectorAll('script');
         // console.log('[PostDownloader] Scanning', allScripts.length, 'script tags');
+
+        const matches: Array<{
+            urls: { videoUrl: string; audioUrl?: string };
+            score: number;
+            matchType: string;
+        }> = [];
 
         for (const script of allScripts) {
             const content = script.textContent || '';
@@ -209,48 +213,100 @@ export class PostDownloader extends Downloader {
 
             try {
                 const data = JSON.parse(content);
-                const result = PostDownloader.findDashManifestByPostId(data, postId);
+                const result = PostDownloader.findMatchingDashManifestWithScore(data, duration, postId);
                 if (result) {
-                    // console.log('[PostDownloader] ✓ Found exact match for postId:', postId);
-                    return result;
+                    matches.push(result);
                 }
             } catch {
                 // Not valid JSON, skip
             }
         }
 
-        // console.log('[PostDownloader] No DASH manifest found for postId:', postId);
-        return null;
+        if (matches.length === 0) {
+            // console.log('[PostDownloader] No matching video data found in page scripts');
+            return null;
+        }
+
+        // Sort by score (highest first)
+        matches.sort((a, b) => b.score - a.score);
+
+        // console.log('[PostDownloader] Found', matches.length, 'matches in page scripts, best:', matches[0].matchType, 'score:', matches[0].score);
+        return matches[0].urls;
     }
 
     /**
      * Recursively search for DASH manifest matching the postId
      * Returns first exact match found
      */
-    private static findDashManifestByPostId(
+    private static findMatchingDashManifestWithScore(
         obj: any,
-        postId: string,
+        targetDuration: number,
+        postId: string | null = null,
         depth = 0
-    ): { videoUrl: string; audioUrl?: string } | null {
+    ): { urls: { videoUrl: string; audioUrl?: string }; score: number; matchType: string } | null {
         // Prevent infinite recursion
         if (depth > 30 || !obj || typeof obj !== 'object') {
             return null;
         }
 
-        // Check if this object has video_dash_manifest
-        if (obj.video_dash_manifest && typeof obj.video_dash_manifest === 'string') {
-            // Check if this object matches our postId
-            const objStr = JSON.stringify(obj);
-            const hasExactPostId =
-                objStr.includes(`"shortcode":"${postId}"`) ||
-                objStr.includes(`"code":"${postId}"`) ||
-                objStr.includes(`"pk":"${postId}"`);
+        let bestMatch: { urls: { videoUrl: string; audioUrl?: string }; score: number; matchType: string } | null = null;
 
-            if (hasExactPostId) {
-                // Found exact match - parse and return
-                const urls = PostDownloader.parseDashManifest(obj.video_dash_manifest);
-                if (urls) {
-                    return urls;
+        // Check if this object has a video_dash_manifest field
+        if (obj.video_dash_manifest && typeof obj.video_dash_manifest === 'string') {
+            const manifest = obj.video_dash_manifest;
+
+            // Parse DASH manifest duration (format: PT43.945332S)
+            const durationMatch = manifest.match(/mediaPresentationDuration="PT([\d.]+)S"/);
+            if (durationMatch) {
+                const duration = parseFloat(durationMatch[1]);
+                const durationDiff = Math.abs(duration - targetDuration);
+
+                // Check if this object has the postId we're looking for
+                const objStr = JSON.stringify(obj);
+                const hasExactPostId = postId && (
+                    objStr.includes(`"shortcode":"${postId}"`) ||
+                    objStr.includes(`"code":"${postId}"`) ||
+                    objStr.includes(`"pk":"${postId}"`)
+                );
+
+                // If we have an exact postId match, accept it regardless of duration
+                // OR if duration matches within tolerance
+                if (hasExactPostId || durationDiff < 0.1) {
+                    // Extract video and audio URLs from DASH manifest
+                    const urls = PostDownloader.parseDashManifest(manifest);
+                    if (urls) {
+                        // Calculate match score based on available identifiers
+                        let score = 0;
+                        let matchType = '';
+
+                        // Best match: has the exact postId
+                        if (hasExactPostId) {
+                            score = 100;
+                            matchType = durationDiff < 0.1 ? 'exact_postId_and_duration' : 'exact_postId_only';
+                            // console.log('[PostDownloader] Found exact postId match:', postId, 'with duration diff:', durationDiff.toFixed(2));
+                        }
+                        // Good match: postId appears somewhere in the object (less specific)
+                        else if (postId && objStr.includes(postId)) {
+                            score = 75;
+                            matchType = 'postId_mentioned_and_duration';
+                        }
+                        // Fallback: only duration match
+                        else {
+                            score = 50;
+                            matchType = 'duration_only';
+                        }
+
+                        // Adjust score based on duration precision (closer = better)
+                        // But don't penalize too much if we have exact postId match
+                        score -= Math.min(durationDiff * 10, 20); // Penalty for duration mismatch
+
+                        // console.log('[PostDownloader] Found candidate:', { matchType, score, durationDiff });
+
+                        const result = { urls, score, matchType };
+                        if (!bestMatch || result.score > bestMatch.score) {
+                            bestMatch = result;
+                        }
+                    }
                 }
             }
         }
@@ -258,17 +314,21 @@ export class PostDownloader extends Downloader {
         // Recursively search nested objects and arrays
         if (Array.isArray(obj)) {
             for (const item of obj) {
-                const result = PostDownloader.findDashManifestByPostId(item, postId, depth + 1);
-                if (result) return result;
+                const result = PostDownloader.findMatchingDashManifestWithScore(item, targetDuration, postId, depth + 1);
+                if (result && (!bestMatch || result.score > bestMatch.score)) {
+                    bestMatch = result;
+                }
             }
         } else {
             for (const key in obj) {
-                const result = PostDownloader.findDashManifestByPostId(obj[key], postId, depth + 1);
-                if (result) return result;
+                const result = PostDownloader.findMatchingDashManifestWithScore(obj[key], targetDuration, postId, depth + 1);
+                if (result && (!bestMatch || result.score > bestMatch.score)) {
+                    bestMatch = result;
+                }
             }
         }
 
-        return null;
+        return bestMatch;
     }
 
     private static parseDashManifest(manifest: string): { videoUrl: string; audioUrl?: string } | null {
@@ -365,23 +425,31 @@ export class PostDownloader extends Downloader {
         }
 
         // We're on detail page - find video and download
-        // Check for ?img_index parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        const imgIndex: string | null = urlParams.get('img_index') ?? null;
+        // We're on detail page - find video and download
         const videoElements = Array.from<HTMLVideoElement>(document.querySelectorAll('main[role="main"] video'));
-
-        // console.log({ imgIndex, length: videoElements.length });
 
         let video: HTMLVideoElement | undefined = undefined;
 
-        // Not a carousel
-        if (imgIndex === null) {
-            video = videoElements[0];
-        } else {
-            if (videoElements.length < 3) {
-                video = videoElements[Number(imgIndex) - 1];
-            } else {
-                video = videoElements[1];
+        // Find the video element closest to the center of the viewport
+        const viewportCenterX = window.innerWidth / 2;
+        const viewportCenterY = window.innerHeight / 2;
+        let minDistance = Infinity;
+
+        for (const v of videoElements) {
+            const rect = v.getBoundingClientRect();
+
+            // Skip hidden elements
+            if (rect.width === 0 || rect.height === 0) continue;
+
+            const vCenterX = rect.left + rect.width / 2;
+            const vCenterY = rect.top + rect.height / 2;
+
+            // Euclidean distance to center
+            const distance = Math.sqrt(Math.pow(vCenterX - viewportCenterX, 2) + Math.pow(vCenterY - viewportCenterY, 2));
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                video = v;
             }
         }
 
