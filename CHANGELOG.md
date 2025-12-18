@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.2] - 2025-12-18
+
+### Fixed
+- **Cross-Region Compatibility**: Fixed share button detection to work across different Instagram UI versions in different regions (US, EU, etc.).
+  - Removed dependency on `:has()` CSS pseudo-class which is not supported in all browsers.
+  - Implemented DOM traversal approach to find share buttons using multiple SVG element selectors.
+  - Added support for both `<path>` elements (EU/Spanish version) and `<polygon>` elements (US version) in share button detection.
+  - Added fallback selectors using `<line>` elements present in both UI variations.
+
 ## [2.0.1] - 2025-12-15
 
 ### Added
