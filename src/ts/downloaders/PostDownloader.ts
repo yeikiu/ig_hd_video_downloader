@@ -521,13 +521,36 @@ export class PostDownloader extends Downloader {
      */
     public async createDownloadButton(): Promise<void> {
         // console.log('[PostDownloader] createDownloadButton called');
-        let postList: HTMLElement[] = [...document.querySelectorAll(QuerySelectors.postWrapper)] as HTMLElement[];
+
+        // Find all share button SVG elements (path or polygon)
+        const shareIcons = [...document.querySelectorAll(QuerySelectors.postWrapper)] as HTMLElement[];
+        // console.log('[PostDownloader] Found share icons:', shareIcons.length);
+
+        // Traverse up from each SVG to find the parent section
+        const postList: HTMLElement[] = [];
+        const seenSections = new Set<HTMLElement>();
+
+        shareIcons.forEach((icon) => {
+            // Traverse up to find the parent section
+            let current = icon.parentElement;
+            while (current && current.tagName !== 'SECTION') {
+                current = current.parentElement;
+            }
+
+            // If we found a section and haven't seen it before, add it
+            if (current && current.tagName === 'SECTION' && !seenSections.has(current)) {
+                seenSections.add(current);
+                postList.push(current as HTMLElement);
+            }
+        });
+
         // console.log('[PostDownloader] Found post wrappers:', postList.length);
 
         // Sometimes the button gets added at the moment the image gets updated
         // If this is the case the image download button cannot be added, so here is a timeout to try it again
         if (postList.length === 0) {
-            postList = await this.retryCreateButton();
+            const retryList = await this.retryCreateButton();
+            retryList.forEach(el => postList.push(el));
         }
         this.creationTimeoutList.forEach(t => clearTimeout(t));
         this.creationTimeoutList = [];
@@ -670,9 +693,21 @@ export class PostDownloader extends Downloader {
         }
 
         // Always search for share button and insert before it
-        const shareElement: HTMLElement = element.querySelector(QuerySelectors.postShare) as HTMLElement;
+        // Find the share icon SVG element first
+        const shareIcon = element.querySelector(QuerySelectors.postShare) as HTMLElement;
+        if (!shareIcon) {
+            // console.log('[PostDownloader] No share icon found, skipping');
+            return;
+        }
+
+        // Traverse up from the SVG to find the parent button/div with role="button"
+        let shareElement: HTMLElement | null = shareIcon.parentElement;
+        while (shareElement && shareElement.getAttribute('role') !== 'button' && shareElement.tagName !== 'BUTTON') {
+            shareElement = shareElement.parentElement;
+        }
+
         if (!shareElement) {
-            // console.log('[PostDownloader] No share element found, skipping');
+            // console.log('[PostDownloader] No share button element found, skipping');
             return;
         }
 
